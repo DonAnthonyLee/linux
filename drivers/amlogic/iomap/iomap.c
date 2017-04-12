@@ -293,33 +293,20 @@ static noinline int __invoke_sec_fn_smc(u32 function_id, u32 arg0, u32 arg1,
 	return function_id;
 }
 #else
-static noinline int __invoke_sec_fn_smc(u32 function_id, u32 arg0, u32 arg1,
-					 u32 arg2)
-{
-	asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x2")
-			__asmeq("%3", "x3")
-			"smc	#0\n"
-		: "+r" (function_id)
-		: "r" (arg0), "r" (arg1), "r" (arg2));
+extern asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
 
-	return function_id;
-}
+#define __invoke_sec_fn_smc	__invoke_psci_fn_smc
 #endif
 
-int  aml_read_sec_reg(unsigned int reg)
+int aml_read_sec_reg(unsigned int reg)
 {
 	return __invoke_sec_fn_smc(0x82000035, reg, 0, 0);
 }
 
-void  aml_write_sec_reg(unsigned int reg, unsigned int val)
+void aml_write_sec_reg(unsigned int reg, unsigned int val)
 {
 	 __invoke_sec_fn_smc(0x82000036, reg, val, 0);
 }
-
-
 
 static int iomap_probe(struct platform_device *pdev)
 {
