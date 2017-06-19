@@ -155,7 +155,8 @@ struct priv {
 	struct reset_control *rstc;
 
 	int type;
-	int nchan;
+	unsigned int nchan;
+	unsigned int bclk_ratio;
 
 	struct snd_dmaengine_dai_dma_data playback_dma_data;
 };
@@ -181,6 +182,7 @@ static void sun8i_i2s_init(struct priv *priv)
 			   0);
 
 	priv->nchan = 2;
+	priv->bclk_ratio = PCM_LRCK_PERIOD * priv->nchan;
 
 	/* A83T */
 	if (priv->type == SOC_A83T) {
@@ -242,14 +244,14 @@ static int sun8i_i2s_set_clock(struct priv *priv, unsigned long rate)
 		1, 2, 4, 6, 8, 12, 16, 24,
 	};
 
-	DBGOUT("%s: rate = %lu.", __func__, rate);
+	DBGOUT("%s: rate = %lu, bclk_ratio = %u.", __func__, rate, priv->bclk_ratio);
 
 	/* compute the sys clock rate and divide values */
 	if (rate % 1000 == 0)
 		freq = 24576000;
 	else
 		freq = 22579200;
-	div = freq / 2 / PCM_LRCK_PERIOD / rate;
+	div = freq / (((unsigned long)priv->bclk_ratio) * rate);
 	if (priv->type == SOC_A83T)
 		div /= 2;			/* bclk_div==0 => mclk/2 */
 	for (i = 0; i < ARRAY_SIZE(div_tb) - 1; i++)
@@ -273,13 +275,18 @@ static int sun8i_i2s_set_clock(struct priv *priv, unsigned long rate)
 
 	/* format */
 	if (priv->type == SOC_A83T) {
+		if (priv->bclk_ratio != 32 * priv->nchan) {
+			// TODO
+			return -EINVAL;
+		}
 		regmap_update_bits(priv->regmap, I2S_FAT0,
 				   I2S_FAT0_A83T_WSS_32BCLK | I2S_FAT0_A83T_SR_MSK,
 				   I2S_FAT0_A83T_WSS_32BCLK | I2S_FAT0_A83T_SR_16BIT);
 	} else {
 		regmap_update_bits(priv->regmap, I2S_FAT0,
 				   I2S_FAT0_H3_LRCKR_PERIOD_MSK | I2S_FAT0_H3_LRCK_PERIOD_MSK,
-				   I2S_FAT0_H3_LRCK_PERIOD(PCM_LRCK_PERIOD - 1) | I2S_FAT0_H3_LRCKR_PERIOD(PCM_LRCKR_PERIOD - 1));
+				   I2S_FAT0_H3_LRCK_PERIOD((priv->bclk_ratio / priv->nchan) - 1) |
+				   I2S_FAT0_H3_LRCKR_PERIOD(PCM_LRCKR_PERIOD - 1));
 
 		regmap_update_bits(priv->regmap, I2S_FAT0,
 				   I2S_FAT0_H3_SW_MSK | I2S_FAT0_H3_SR_MSK,
@@ -667,12 +674,26 @@ static int sun8i_i2s_trigger(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int sun8i_i2s_set_bclk_ratio(struct snd_soc_dai *dai, unsigned int ratio)
+{
+	struct snd_soc_card *card = snd_soc_dai_get_drvdata(dai);
+	struct priv *priv = snd_soc_card_get_drvdata(card);
+
+	DBGOUT("%s: ratio = %u\n",
+	       __func__, ratio);
+
+	priv->bclk_ratio = ratio;
+
+	return 0;
+}
+
 static const struct snd_soc_dai_ops sun8i_i2s_dai_ops = {
 	.hw_params	= sun8i_i2s_hw_params,
 	.set_fmt	= sun8i_i2s_set_fmt,
 	.shutdown	= sun8i_i2s_shutdown,
 	.startup	= sun8i_i2s_startup,
 	.trigger	= sun8i_i2s_trigger,
+	.set_bclk_ratio	= sun8i_i2s_set_bclk_ratio,
 };
 
 static int sun8i_i2s_controls_get(struct snd_kcontrol *kcontrol,
@@ -1087,7 +1108,7 @@ static int sun8i_i2s_dev_probe(struct platform_device *pdev)
 			return ret;
 	}
 
-	priv->playback_dma_data.maxburst = 8;
+	priv->playback_dma_data.maxburst = (priv->type == SOC_H3 ? 4 : 8);
 	priv->playback_dma_data.addr = res->start + I2S_TXFIFO;
 	priv->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
 
