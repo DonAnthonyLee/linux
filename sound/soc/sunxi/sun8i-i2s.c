@@ -241,7 +241,7 @@ static int sun8i_i2s_set_clock(struct priv *priv, unsigned long rate)
 	unsigned long freq;
 	int ret, i, div;
 	static const u8 div_tb[] = {
-		1, 2, 4, 6, 8, 12, 16, 24,
+		1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 176, 192,
 	};
 
 	DBGOUT("%s: rate = %lu, bclk_ratio = %u.", __func__, rate, priv->bclk_ratio);
@@ -257,6 +257,8 @@ static int sun8i_i2s_set_clock(struct priv *priv, unsigned long rate)
 	for (i = 0; i < ARRAY_SIZE(div_tb) - 1; i++)
 		if (div_tb[i] >= div)
 			break;
+
+	DBGOUT("%s: freq = %lu, div = %d", __func__, freq, div_tb[i]);
 
 	ret = clk_set_rate(priv->mod_clk, freq);
 	if (ret) {
@@ -764,7 +766,7 @@ static struct snd_soc_dai_driver sun8i_i2s_dai = {
 		.channels_max = 8,
 		.rates = SNDRV_PCM_RATE_8000_192000 | SNDRV_PCM_RATE_KNOT,
 		.rate_min = 8000,
-		.rate_max = 192000,
+		.rate_max = 384000,
 		.formats = I2S_FORMATS,
 	},
 	.ops = &sun8i_i2s_dai_ops,
@@ -784,7 +786,7 @@ static const struct snd_pcm_hardware sun8i_i2s_pcm_hardware = {
 	.formats = I2S_FORMATS,
 	.rates = SNDRV_PCM_RATE_8000_192000 | SNDRV_PCM_RATE_KNOT,
 	.rate_min = 8000,
-	.rate_max = 192000,
+	.rate_max = 384000,
 	.channels_min = 1,
 	.channels_max = 8,
 	.buffer_bytes_max = 1024 * 1024,
