@@ -32,4 +32,14 @@
 		};
 	};
 
+	fragment@3 {
+		target-path = <&pio>;
+		__overlay__ {
+			i2s0_pins: i2s0 {
+				pins = "PA18", "PA19", "PA20", "PA21"; /* no MCLK needed */
+				function = "i2s0";
+			};
+		};
+	};
+
 };

@@ -303,6 +303,11 @@
 		pins = "PD6";
 		function = "gpio_out";
 	};
+
+	i2s0_pins: i2s0 {
+		pins = "PA6", "PA18", "PA19", "PA20", "PA21";
+		function = "i2s0";
+	};
 };
 
 &r_pio {
